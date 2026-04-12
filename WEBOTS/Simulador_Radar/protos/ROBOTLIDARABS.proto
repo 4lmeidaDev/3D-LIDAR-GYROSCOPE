@@ -1,0 +1,134 @@
+#VRML_SIM R2025a utf8
+# license: Apache License 2.0
+# license url: http://www.apache.org/licenses/LICENSE-2.0
+# This is a proto file for Webots for the ROBOTLIDARABS
+# Extracted from: C:\Users\franc\Desktop\PROJETO LIDAR\SOLIDWORKS TERMINDADO\ROBOTLIDARABS\urdf\ROBOTLIDARABS.urdf
+
+PROTO ROBOTLIDARABS [
+  field  SFVec3f     translation     0 0 0
+  field  SFRotation  rotation        0 0 1 0
+  field  SFString    name            "ROBOTLIDARABS"  # Is `Robot.name`.
+  field  SFString    controller      "void"           # Is `Robot.controller`.
+  field  MFString    controllerArgs  []               # Is `Robot.controllerArgs`.
+  field  SFString    customData      ""               # Is `Robot.customData`.
+  field  SFBool      supervisor      FALSE            # Is `Robot.supervisor`.
+  field  SFBool      synchronization TRUE             # Is `Robot.synchronization`.
+  field  SFBool      selfCollision   FALSE            # Is `Robot.selfCollision`.
+]
+{
+  Robot {
+    translation IS translation
+    rotation IS rotation
+    controller IS controller
+    controllerArgs IS controllerArgs
+    customData IS customData
+    supervisor IS supervisor
+    synchronization IS synchronization
+    selfCollision IS selfCollision
+    children [
+      Shape {
+        appearance DEF ANEL_EXTERIOR_material PBRAppearance {
+          baseColor 0.792160 0.819610 0.933330
+          roughness 1.000000
+          metalness 0
+        }
+        geometry DEF ANEL_EXTERIOR Mesh {
+          url "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/ANEL_EXTERIOR.STL"
+        }
+      }
+      HingeJoint {
+        jointParameters HingeJointParameters {
+          axis 0.000000 -1.000000 -0.000004
+          anchor 0.000000 0.000000 0.130000
+        }
+        device [
+          RotationalMotor {
+            name "ANEL_INTERIOR_JOINT"
+            maxTorque 10000
+          }
+          PositionSensor {
+            name "ANEL_INTERIOR_JOINT_sensor"
+          }
+        ]
+        endPoint Solid {
+          translation 0.000000 0.000000 0.130000
+          rotation 1.000000 0.000000 0.000000 1.570800
+          children [
+            Shape {
+              appearance DEF ANEL_INTERIOR_material PBRAppearance {
+                baseColor 0.792160 0.819610 0.933330
+                roughness 1.000000
+                metalness 0
+              }
+              geometry DEF ANEL_INTERIOR Mesh {
+                url "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/ANEL_INTERIOR.STL"
+              }
+            }
+            HingeJoint {
+              jointParameters HingeJointParameters {
+                axis 0.999915 -0.012700 0.000000
+              }
+              device [
+                RotationalMotor {
+                  name "PLATAFORMA_JOINT"
+                  maxTorque 10000
+                }
+                PositionSensor {
+                  name "PLATAFORMA_JOINT_sensor"
+                }
+              ]
+              endPoint Solid {
+                rotation 0.000000 0.000000 1.000000 0.050797
+                children [
+                  Shape {
+                    appearance DEF PLATAFORMA_material PBRAppearance {
+                      baseColor 0.792160 0.819610 0.933330
+                      roughness 1.000000
+                      metalness 0
+                    }
+                    geometry DEF PLATAFORMA Mesh {
+                      url "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/PLATAFORMA.STL"
+                    }
+                  }
+                ]
+                name "PLATAFORMA"
+                boundingObject USE PLATAFORMA
+                physics Physics {
+                  density -1
+                  mass 0.095647
+                  centerOfMass [ 0.000320 0.009451 0.000059 ]
+                  inertiaMatrix [
+                    3.615500e-05 4.238600e-05 3.702200e-05
+                    1.416400e-07 5.296500e-09 1.759500e-07
+                  ]
+                }
+              }
+            }
+          ]
+          name "ANEL_INTERIOR"
+          boundingObject USE ANEL_INTERIOR
+          physics Physics {
+            density -1
+            mass 0.080301
+            centerOfMass [ 0.029334 -0.000373 -0.001107 ]
+            inertiaMatrix [
+              8.662500e-05 2.005000e-04 1.199400e-04
+              1.446400e-06 -2.235700e-06 2.830500e-08
+            ]
+          }
+        }
+      }
+    ]
+    name IS name
+    boundingObject Cylinder { height 0.005 radius 0.092 }
+    physics Physics {
+      density -1
+      mass 0.329490
+      centerOfMass [ -0.001685 0.057135 -0.010584 ]
+      inertiaMatrix [
+        2.251300e-03 2.128300e-03 2.012000e-03
+        4.044300e-05 -4.131700e-05 2.553400e-04
+      ]
+    }
+  }
+}

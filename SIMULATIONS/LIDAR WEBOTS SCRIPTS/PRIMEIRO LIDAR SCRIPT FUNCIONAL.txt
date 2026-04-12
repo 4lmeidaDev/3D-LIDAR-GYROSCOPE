@@ -1,0 +1,120 @@
+from controller import Robot
+import math
+import numpy as np
+import plotly.graph_objects as go
+import time
+
+# --- 1. CONFIGURAÇÕES DE ENGENHARIA ---
+robot = Robot()
+timestep = int(robot.getBasicTimeStep())
+
+Z_TORRE = 0.140  # 130mm fixos (Eixo Z)
+L_BRACO = 0.032  # 32mm do eixo ao sensor (Braço móvel)
+
+# --- 2. PARÂMETROS DO MOVIMENTO ---
+angulo_max = math.pi/3        
+coef_vel = 4.0    
+tempo_total = 10.0       
+
+# --- 3. DISPOSITIVOS E SENSORES ---
+motor_anel = robot.getDevice("ANEL_INTERIOR_JOINT")
+motor_plat = robot.getDevice("PLATAFORMA_JOINT")
+
+# Sensores de Posição ( feedback real para evitar lag )
+sensor_anel = robot.getDevice("ANEL_INTERIOR_JOINT_sensor") 
+sensor_plat = robot.getDevice("PLATAFORMA_JOINT_sensor")
+
+if sensor_anel: sensor_anel.enable(timestep)
+if sensor_plat: sensor_plat.enable(timestep)
+
+lidar = robot.getDevice("lidar")
+lidar.enable(timestep)
+
+# Listas para a Nuvem de Pontos
+x_points, y_points, z_points = [], [], []
+res_horizontal = lidar.getHorizontalResolution()
+fov = lidar.getFov()
+
+# --- 4. CALIBRAÇÃO DE OFFSETS (AFINAÇÃO DE ENGENHARIA) ---
+# Se o chão subir/descer ao longe (eixo X): ajusta beta
+# Se o chão parecer "torcido" lateralmente (eixo Y): ajusta alpha
+offset_alpha = 0.0485276811  # Tenta valores pequenos como 0.005 ou -0.005
+offset_beta  = 0.0  #0.0434581223663475
+
+print(f"Recolhendo dados... Calibração Alpha: {offset_alpha} | Beta: {offset_beta}")
+
+# --- 5. LOOP DE SIMULAÇÃO ---
+while robot.step(timestep) != -1:
+    t = robot.getTime()
+    if t > tempo_total:
+        break
+    
+    # Comandar movimento harmónico
+    pos_alvo_alpha = angulo_max * math.sin(coef_vel * t)
+    pos_alvo_beta = angulo_max * math.sin(coef_vel * t + (math.pi/2))
+    
+    motor_anel.setPosition(pos_alvo_alpha)
+    motor_plat.setPosition(pos_alvo_beta)
+    
+    # LER POSIÇÃO REAL + OFFSETS
+    # Se os sensores não estiverem no .proto, o código usa o valor alvo
+    alpha = (sensor_anel.getValue() if sensor_anel else pos_alvo_alpha) + offset_alpha
+    beta  = (sensor_plat.getValue() if sensor_plat else pos_alvo_beta) + offset_beta
+    
+    ranges = lidar.getRangeImage()
+    
+    if ranges:
+        # Decimação de 5 em 5 para manter o Plotly fluido
+        for i in range(0, res_horizontal, 5): 
+            dist = ranges[i]
+            if dist > 11.9 or dist < 0.18: continue 
+            
+            theta = (i / res_horizontal) * fov
+            lx = dist * math.cos(theta)
+            ly = dist * math.sin(theta)
+            dz_sensor = L_BRACO 
+            
+            # CINEMÁTICA (X=Plat, Y=Anel, Z=Altura)
+            # 1. Rotação em Beta (Eixo X) - Afeta Y e Z
+            x1 = lx
+            y1 = ly * math.cos(beta) - dz_sensor * math.sin(beta)
+            z1 = ly * math.sin(beta) + dz_sensor * math.cos(beta)
+            
+            # 2. Rotação em Alpha (Eixo Y) - Afeta X e Z
+            X = x1 * math.cos(alpha) + z1 * math.sin(alpha)
+            Y = y1
+            Z_proj = -x1 * math.sin(alpha) + z1 * math.cos(alpha)
+            
+            # 3. Altura Final (Z)
+            Z = Z_proj + Z_TORRE
+            
+            x_points.append(X)
+            y_points.append(Y)
+            z_points.append(Z)
+
+# --- 6. VISUALIZAÇÃO ---
+print("Simulação concluída. A gerar gráfico persistente...")
+
+if len(x_points) > 0:
+    fig = go.Figure(data=[go.Scatter3d(
+        x=x_points, y=y_points, z=z_points, 
+        mode='markers',
+        marker=dict(size=1.5, color=z_points, colorscale='Viridis', opacity=0.8)
+    )])
+
+    fig.update_layout(
+        title=f"Scan 3D LD19 (Offsets: A={offset_alpha}, B={offset_beta})",
+        scene=dict(
+            xaxis=dict(range=[-6, 6], title='X (m)'),
+            yaxis=dict(range=[-6, 6], title='Y (m)'),
+            zaxis=dict(range=[0, 4], title='Z - Altura (m)'),
+            aspectratio=dict(x=1, y=1, z=0.5)
+        )
+    )
+    
+    fig.write_html("meu_scan_3d.html")
+    fig.show()
+
+# Aguarda a abertura do browser
+time.sleep(2)
+robot.step(0)
