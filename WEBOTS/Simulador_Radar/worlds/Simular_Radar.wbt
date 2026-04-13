@@ -3,13 +3,15 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/boston_dynamics/spot/protos/Spot.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/humans/pedestrian/protos/Pedestrian.proto"
 
 WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.1921964958154999 0.1504013302915361 -0.9697628302027146 1.9209678792927234
-  position 1.0241451546219889 2.1686681352332307 1.148068422805231
+  orientation 0.3712058152272304 0.35904256659236444 -0.8563262684959835 1.7988072702402587
+  position 0.9561954019600243 6.381637876990134 7.417929818681609
 }
 TexturedBackground {
 }
@@ -154,4 +156,11 @@ Robot {
     ]
   }
   controller "my_controller"
+}
+Spot {
+  translation -1.18 -1.39 0.624
+}
+Pedestrian {
+  translation 2.41115 -2.41116 1.27
+  rotation 0 0 1 2.35619
 }

@@ -5,7 +5,7 @@ sceneTreePerspectives: 000000ff000000010000000300000022000002ce000000fa010000000
 maximizedDockId: -1
 centralWidgetVisible: 1
 orthographicViewHeight: 1
-textFiles: 1 "controllers/my_controller/my_controller.py" "controllers/my_controller/scan.py" "controllers/my_controller/search.py" "controllers/my_controller/kinematics.py"
+textFiles: 4 "controllers/my_controller/my_controller.py" "controllers/my_controller/scan.py" "controllers/my_controller/search.py" "controllers/my_controller/kinematics.py" "controllers/my_controller/searchDBSCAN.py"
 globalOptionalRendering: DistanceSensorRays::LidarRaysPaths
 consoles: Console:All:All
 renderingDevicePerspectives: Crazyflie:camera;1;1;0;0

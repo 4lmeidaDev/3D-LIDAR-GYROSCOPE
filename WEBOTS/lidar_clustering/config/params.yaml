@@ -1,0 +1,19 @@
+lidar_clustering:
+  ros__parameters:
+    # Tópicos
+    input_topic:  '/lidar/point_cloud'   # PointCloud2 publicado pelo Webots ROS2 bridge
+    output_topic: '/lidar/clusters'      # MarkerArray para o RViz2
+    frame_id:     'map'                  # fallback se o msg não tiver frame_id
+
+    # Pré-processamento
+    voxel_size: 0.05    # [m] resolução do Voxel Grid (5 cm)
+    z_min:      0.05    # [m] altura mínima — remove chão
+    z_max:      3.00    # [m] altura máxima — remove teto
+
+    # DBSCAN
+    cluster_tolerance: 0.30    # [m] raio de vizinhança (eps)
+    min_cluster_size:  10      # pontos mínimos para ser considerado cluster
+    max_cluster_size:  25000   # pontos máximos (filtra paredes/fundo que passem o z filter)
+
+    # Visualização
+    marker_lifetime: 1.0   # [s] duração dos markers no RViz2

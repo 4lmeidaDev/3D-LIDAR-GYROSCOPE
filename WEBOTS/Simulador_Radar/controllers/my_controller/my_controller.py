@@ -43,7 +43,7 @@ def _invalidar_cache(nome_ficheiro):
     _bytecode_cache.pop(nome_ficheiro, None)
 
 # Pré-compilar ambos os scripts no arranque do Webots
-for _f in ("scan.py", "search.py"):
+for _f in ("scan.py", "search.py", "searchDBSCAN.py"):
     _compilar(_f)
 
 # ==============================================================================
@@ -78,6 +78,7 @@ def executar_script(nome_ficheiro):
     _a_executar = True
     btn_scan.config(state="disabled")
     btn_search.config(state="disabled")
+    btn_search_dbscan.config(state="disabled")
 
     try:
         exec(codigo, globals())
@@ -91,6 +92,7 @@ def executar_script(nome_ficheiro):
         _a_executar = False
         btn_scan.config(state="normal")
         btn_search.config(state="normal")
+        btn_search_dbscan.config(state="normal")
         print(f"[CTRL] '{nome_ficheiro}' terminou.\n")
 
 # ==============================================================================
@@ -155,6 +157,12 @@ btn_search = ttk.Button(
     command=lambda: executar_script("search.py")
 )
 btn_search.pack(fill='x', pady=4)
+
+btn_search_dbscan = ttk.Button(
+    frame_search, text="▶  SEARCH DBSCAN",
+    command=lambda: executar_script("searchDBSCAN.py")
+)
+btn_search_dbscan.pack(fill='x', pady=4)
 
 # --- Status bar ---
 ttk.Separator(root, orient='horizontal').pack(fill='x', pady=10, padx=10)
