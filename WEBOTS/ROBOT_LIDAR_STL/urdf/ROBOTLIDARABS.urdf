@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="ROBOTLIDARABS">
+  <link
+    name="ANEL_EXTERIOR">
+    <inertial>
+      <origin
+        xyz="-0.0016845 0.057135 -0.010584"
+        rpy="0 0 0" />
+      <mass
+        value="0.32949" />
+      <inertia
+        ixx="0.0022513"
+        ixy="4.0443E-05"
+        ixz="-4.1317E-05"
+        iyy="0.0021283"
+        iyz="0.00025534"
+        izz="0.002012" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/ANEL_EXTERIOR.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/ANEL_EXTERIOR.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="ANEL_INTERIOR">
+    <inertial>
+      <origin
+        xyz="0.029334 -0.00037252 -0.0011071"
+        rpy="0 0 0" />
+      <mass
+        value="0.080301" />
+      <inertia
+        ixx="8.6625E-05"
+        ixy="1.4464E-06"
+        ixz="-2.2357E-06"
+        iyy="0.0002005"
+        iyz="2.8305E-08"
+        izz="0.00011994" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/ANEL_INTERIOR.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/ANEL_INTERIOR.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ANEL_INTERIOR_JOINT"
+    type="continuous">
+    <origin
+      xyz="0 0 0.13"
+      rpy="1.5708 0 0" />
+    <parent
+      link="ANEL_EXTERIOR" />
+    <child
+      link="ANEL_INTERIOR" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="PLATAFORMA">
+    <inertial>
+      <origin
+        xyz="0.0003197 0.0094512 5.8712E-05"
+        rpy="0 0 0" />
+      <mass
+        value="0.095647" />
+      <inertia
+        ixx="3.6155E-05"
+        ixy="1.4164E-07"
+        ixz="5.2965E-09"
+        iyy="4.2386E-05"
+        iyz="1.7595E-07"
+        izz="3.7022E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/PLATAFORMA.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ROBOTLIDARABS/meshes/PLATAFORMA.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="PLATAFORMA_JOINT"
+    type="continuous">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0.050797" />
+    <parent
+      link="ANEL_INTERIOR" />
+    <child
+      link="PLATAFORMA" />
+    <axis
+      xyz="0.99798 -0.063454 0" />
+  </joint>
+</robot>

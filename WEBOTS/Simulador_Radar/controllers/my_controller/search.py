@@ -1,120 +1,315 @@
 import numpy as np
 import os
-import sys
 import math
+import threading
+import queue
 import vispy
 from vispy import app, scene
 from kinematics import get_3d_points
 
-# 1. FORÇAR BACKEND PYQT6 PARA COEXISTIR COM TKINTER
-vispy.use('PyQt6')
-
-# --- CONFIGURAÇÕES DE ENGENHARIA ---
-# Devem ser idênticas ao scan.py para o filtro de ruído encaixar
+# ==============================================================================
+# CONFIGURAÇÕES — DEVEM SER BYTE-A-BYTE IGUAIS AO scan.py
+# Se mudares qualquer valor aqui, muda também no scan.py e volta a fazer scan!
+# ==============================================================================
 Z_TORRE, L_BRACO = 0.130, 0.032
-RAIO_MIN = 0.05  # Resolução de 5cm (para objetos de 10cm)
+RAIO_MIN         = 0.05   # Resolução de 5cm — IGUAL ao scan.py
 
-# Recuperar parâmetros da GUI (my_controller.py)
-FREQ = float(os.getenv("PARAM_FREQ", 0.5))
-FOV_G = float(os.getenv("PARAM_FOV", 1.047))
+FREQ        = float(os.getenv("PARAM_FREQ",  0.5))
+FOV_G       = float(os.getenv("PARAM_FOV",   1.047))
 TEMPO_TOTAL = float(os.getenv("PARAM_TEMPO", 40.0))
 
-# Decaimento: O ponto "morre" após 1 ciclo de oscilação (para não deixar rasto eterno)
-TEMPO_VIDA = (1.0 / FREQ) * 1.1 
+SUBSAMPLE     = 3          # IGUAL ao scan.py — mesma amostragem de feixes
+PLOT_INTERVAL = 1.0 / 20  # Atualizar gráfico a 20 Hz
 
-# --- 2. CARREGAMENTO DO BACKGROUND (FILTRO DE RUÍDO) ---
+# Decaimento: um ponto morre exatamente após 1 ciclo completo do gimbal.
+# Quando o lidar volta a passar pelo mesmo ponto em t2 = t1 + T_ciclo,
+# o ponto inserido em t1 já foi apagado — a janela é limpa a cada varredura.
+T_CICLO    = 1.0 / FREQ          # duração de 1 ciclo sinusoidal completo
+TEMPO_VIDA = T_CICLO             # ponto vive exatamente 1 ciclo
+
+# Sistema de votos: um voxel só é mostrado depois de ser visto N vezes
+# Aumenta para reduzir falsos positivos, diminui para ser mais sensível
+VOTOS_MINIMOS = 2
+
+# ==============================================================================
+# CARREGAR BACKGROUND — scan_otimizado.npy gerado pelo scan.py
+#
+# Construímos um set de voxels com padding 3x3x3 (cubo de 15cm à volta de cada
+# ponto do background). Qualquer ponto novo que caia dentro deste cubo é
+# considerado background e ignorado. Só o que está FORA é "objeto novo".
+# ==============================================================================
 voxels_bg = set()
+bg_pts_display = None
 path_npy = "scan_otimizado.npy"
 
 if os.path.exists(path_npy):
-    print(f"A carregar mapa de referência: {path_npy}")
-    data = np.load(path_npy)
-    # Converter coordenadas reais para índices de grelha (Voxels)
-    v_idx = np.floor(data / RAIO_MIN).astype(int)
-    
-    # PADDING: Bloqueamos o voxel e os 26 vizinhos à volta (Cubo 3x3x3)
-    # Isto cria uma "armadura" de 5cm contra ruído do Lidar nas paredes.
-    for v in v_idx:
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                for dz in [-1, 0, 1]:
-                    voxels_bg.add((v[0]+dx, v[1]+dy, v[2]+dz))
-    print(f"Filtro de ruído blindado: {len(voxels_bg)} células protegidas.")
+    print(f"[SEARCH] A carregar background: {path_npy}")
+    data  = np.load(path_npy).astype(np.float32)
+    bg_pts_display = data
+
+    # Converter para índices de voxel
+    v_idx = np.floor(data / RAIO_MIN).astype(np.int32)
+
+    # Padding 3x3x3 vetorizado — sem loops Python
+    offsets = np.array([[dx, dy, dz]
+                        for dx in (-1, 0, 1)
+                        for dy in (-1, 0, 1)
+                        for dz in (-1, 0, 1)], dtype=np.int32)          # (27, 3)
+    padded = (v_idx[:, None, :] + offsets[None, :, :]).reshape(-1, 3)   # (N*27, 3)
+    voxels_bg = set(map(tuple, padded.tolist()))
+
+    print(f"[SEARCH] Background carregado: {len(data):,} voxels")
+    print(f"[SEARCH] Zona protegida (com padding 3x3x3): {len(voxels_bg):,} células")
+    print(f"[SEARCH] RAIO_MIN={RAIO_MIN*100:.0f}cm | VOTOS={VOTOS_MINIMOS} | TEMPO_VIDA={TEMPO_VIDA:.1f}s")
 else:
-    print("AVISO: scan_otimizado.npy não encontrado! O Search vai mostrar a sala toda.")
+    print("[SEARCH] AVISO: scan_otimizado.npy não encontrado!")
+    print("[SEARCH]        Corre o scan.py primeiro para mapear o background.")
 
-# --- 3. CONFIGURAÇÃO VISPY (GRÁFICO GPU) ---
-canvas = scene.SceneCanvas(keys='interactive', show=True, title='RADAR SEARCH - DETEÇÃO DE INTRUSO')
-view = canvas.central_widget.add_view()
-view.camera = 'turntable'
-scatter = scene.visuals.Markers()
-view.add(scatter)
-scene.visuals.XYZAxis(parent=view.scene)
+# ==============================================================================
+# THREAD VISPY — janela 3D independente, não bloqueia o Webots
+# ==============================================================================
+_data_queue = queue.Queue(maxsize=2)
+_stop_event = threading.Event()
 
-# --- 4. DISPOSITIVOS E SENSORES ---
-# robot e timestep são herdados do my_controller.py
-lidar = robot.getDevice("lidar"); lidar.enable(timestep)
-res_horiz = lidar.getHorizontalResolution()
-fov_lidar = lidar.getFov()
-thetas = np.linspace(-fov_lidar/2, fov_lidar/2, res_horiz)
+def _vispy_thread():
+    vispy.use('PyQt6')
+
+    canvas = scene.SceneCanvas(
+        keys='interactive',
+        show=True,
+        title='RADAR SEARCH — Deteção de Intruso',
+        size=(1024, 768),
+        bgcolor='#0d0d1a',
+    )
+    view = canvas.central_widget.add_view()
+    view.camera = scene.cameras.TurntableCamera(
+        fov=60, distance=5.0, elevation=25, azimuth=45,
+    )
+    scene.visuals.XYZAxis(parent=view.scene)
+    scene.visuals.GridLines(color=(0.25, 0.25, 0.25, 0.4), parent=view.scene)
+
+    # Background a cinzento muito suave — contexto visual da sala
+    scatter_bg = scene.visuals.Markers(parent=view.scene)
+    scatter_bg.antialias = 0
+    if bg_pts_display is not None and len(bg_pts_display) > 0:
+        step = max(1, len(bg_pts_display) // 40_000)
+        pts_bg = bg_pts_display[::step]
+        scatter_bg.set_data(
+            pts_bg,
+            edge_color=None,
+            face_color=(0.18, 0.18, 0.28, 0.25),
+            size=2,
+        )
+        # Ajustar câmara ao tamanho real da sala
+        centro = pts_bg.mean(axis=0)
+        span   = np.linalg.norm(pts_bg.max(axis=0) - pts_bg.min(axis=0))
+        view.camera.center   = tuple(centro)
+        view.camera.distance = float(span) * 0.8
+
+    # Pontos detetados (objetos novos) — coloridos por altura
+    scatter = scene.visuals.Markers(parent=view.scene)
+    scatter.antialias = 0
+
+    def _colorir_por_altura(pts):
+        z = pts[:, 2]
+        t = (z - z.min()) / (z.max() - z.min() + 1e-9)
+        r = np.clip(2.0 * t - 0.5, 0, 1).astype(np.float32)
+        g = (np.clip(2.0 * t, 0, 1) * np.clip(2.0 - 2.0 * t, 0, 1)).astype(np.float32)
+        b = np.clip(1.0 - 2.0 * t, 0, 1).astype(np.float32)
+        a = np.ones(len(pts), dtype=np.float32)
+        return np.column_stack((r, g, b, a))
+
+    def _update(ev):
+        try:
+            payload = _data_queue.get_nowait()
+        except queue.Empty:
+            return
+        if payload is None or len(payload) == 0:
+            scatter.set_data(np.zeros((1, 3), dtype=np.float32),
+                             edge_color=None, face_color=(0, 0, 0, 0), size=1)
+            return
+        scatter.set_data(
+            payload.astype(np.float32),
+            edge_color=None,
+            face_color=_colorir_por_altura(payload),
+            size=6,
+        )
+        canvas.title = f'RADAR SEARCH — {len(payload)} objetos detetados'
+
+    # Guardar referência para evitar garbage collection (bug crítico!)
+    _timer = app.Timer(interval=1/30, connect=_update, start=True)
+
+    @canvas.events.close.connect
+    def _on_close(ev):
+        _stop_event.set()
+
+    app.run()
+
+_t = threading.Thread(target=_vispy_thread, daemon=True)
+_t.start()
+
+# ==============================================================================
+# DISPOSITIVOS E SENSORES  (robot e timestep herdados do my_controller.py)
+# ==============================================================================
+lidar      = robot.getDevice("lidar"); lidar.enable(timestep)
+fov_lidar  = lidar.getFov()
+thetas     = np.linspace(-fov_lidar / 2, fov_lidar / 2, lidar.getHorizontalResolution())
+thetas_sub = thetas[::SUBSAMPLE]
 
 motor_a = robot.getDevice("ANEL_INTERIOR_JOINT")
 motor_b = robot.getDevice("PLATAFORMA_JOINT")
-s_a = robot.getDevice("ANEL_INTERIOR_JOINT_sensor"); s_a.enable(timestep)
-s_b = robot.getDevice("PLATAFORMA_JOINT_sensor"); s_b.enable(timestep)
+s_a     = robot.getDevice("ANEL_INTERIOR_JOINT_sensor"); s_a.enable(timestep)
+s_b     = robot.getDevice("PLATAFORMA_JOINT_sensor");    s_b.enable(timestep)
 
-# Memória dinâmica: { voxel_tup: [ [X,Y,Z], timestamp ] }
-mapa_dinamico = {}
-last_plot_time = 0
-tempo_inicio_search = robot.getTime()
+# ==============================================================================
+# BUFFER DE PONTOS COM SISTEMA DE VOTOS
+#
+# Um voxel só aparece no gráfico depois de ser "visto" VOTOS_MINIMOS vezes.
+# Isto elimina reflexos e ruído pontual do lidar.
+# ==============================================================================
+MAX_PONTOS = 20_000
+vox_keys   = np.empty((MAX_PONTOS, 3), dtype=np.int32)
+vox_pts    = np.empty((MAX_PONTOS, 3), dtype=np.float32)
+vox_times  = np.full(MAX_PONTOS, -9999.0, dtype=np.float32)
+vox_votos  = np.zeros(MAX_PONTOS, dtype=np.int16)
+n_pontos   = 0
+vox_index  = {}   # { (ix,iy,iz): índice }
 
-print("Search em tempo real ativo. Fecha a janela do gráfico para parar.")
+def _inserir(new_pts, new_vkeys, t):
+    global n_pontos
+    for i in range(len(new_pts)):
+        k = (int(new_vkeys[i, 0]), int(new_vkeys[i, 1]), int(new_vkeys[i, 2]))
+        if k in vox_index:
+            idx = vox_index[k]
+            # Se o ponto já expirou (o lidar completou 1 ciclo e voltou),
+            # trata-o como novo: reset de votos e posição.
+            if vox_times[idx] < (t - TEMPO_VIDA):
+                vox_pts[idx]   = new_pts[i]
+                vox_votos[idx] = 1
+            else:
+                # Ainda dentro do ciclo: suavizar posição e acumular votos
+                vox_pts[idx]   = vox_pts[idx] * 0.7 + new_pts[i] * 0.3
+                if vox_votos[idx] < 32767:
+                    vox_votos[idx] += 1
+            vox_times[idx] = t
+        elif n_pontos < MAX_PONTOS:
+            vox_index[k]        = n_pontos
+            vox_keys[n_pontos]  = new_vkeys[i]
+            vox_pts[n_pontos]   = new_pts[i]
+            vox_times[n_pontos] = t
+            vox_votos[n_pontos] = 1
+            n_pontos           += 1
 
-# --- 5. LOOP DE OPERAÇÃO ---
+def _limpar(t):
+    global n_pontos, vox_index
+    if n_pontos == 0:
+        return
+    vivos = vox_times[:n_pontos] >= (t - TEMPO_VIDA)
+    if np.all(vivos):
+        return
+    idx_v  = np.where(vivos)[0]
+    novo_n = len(idx_v)
+    vox_keys[:novo_n]  = vox_keys[idx_v]
+    vox_pts[:novo_n]   = vox_pts[idx_v]
+    vox_times[:novo_n] = vox_times[idx_v]
+    vox_votos[:novo_n] = vox_votos[idx_v]
+    vox_times[novo_n:] = -9999.0
+    vox_votos[novo_n:] = 0
+    vox_index = {
+        (int(vox_keys[i, 0]), int(vox_keys[i, 1]), int(vox_keys[i, 2])): i
+        for i in range(novo_n)
+    }
+    n_pontos = novo_n
+
+def _pontos_confiaveis():
+    if n_pontos == 0:
+        return None
+    mask = vox_votos[:n_pontos] >= VOTOS_MINIMOS
+    if not np.any(mask):
+        return None
+    return vox_pts[:n_pontos][mask].copy()
+
+# ==============================================================================
+# LOOP PRINCIPAL DO SEARCH
+# ==============================================================================
+last_plot_time  = 0.0
+last_report     = 0.0
+REPORT_INTERVAL = 10.0
+
+t_inicio = robot.getTime()
+print(f"[SEARCH] A iniciar deteção em tempo real.")
+print(f"[SEARCH] Fecha a janela 3D para parar.")
+print("-" * 52)
+
 while robot.step(timestep) != -1:
-    t_atual = robot.getTime()
-    t_relativo = t_atual - tempo_inicio_search
-    
-    if t_relativo > TEMPO_TOTAL or canvas._closed:
+
+    if _stop_event.is_set():
         break
 
-    # MOVIMENTO SINUSOIDAL (ESTILO RADAR)
-    pos_a = FOV_G * math.sin(2 * math.pi * FREQ * t_relativo)
-    pos_b = FOV_G * math.sin(2 * math.pi * FREQ * t_relativo + (math.pi/2))
+    t_atual = robot.getTime()
+    t_rel   = t_atual - t_inicio
+    if t_rel > TEMPO_TOTAL:
+        break
+
+    # --- MOVIMENTO SINUSOIDAL --- IGUAL ao scan.py ---
+    pos_a = FOV_G * math.sin(2 * math.pi * FREQ * t_rel)
+    pos_b = FOV_G * math.sin(2 * math.pi * FREQ * t_rel + math.pi / 2)
     motor_a.setPosition(pos_a)
     motor_b.setPosition(pos_b)
 
-    # CAPTURA E CINEMÁTICA VETORIZADA
+    # --- CAPTURA E CINEMÁTICA ---
+    alpha  = s_a.getValue()
+    beta   = s_b.getValue()
     ranges = lidar.getRangeImage()
-    # Processamos 1 em cada 5 feixes (Equilíbrio entre detalhe de 10cm e performance)
-    pts = get_3d_points(ranges[::5], thetas[::5], s_a.getValue(), s_b.getValue(), L_BRACO, Z_TORRE)
+    pts    = get_3d_points(
+        ranges[::SUBSAMPLE], thetas_sub,
+        alpha, beta,
+        L_BRACO, Z_TORRE
+    )
 
+    # --- FILTRAGEM DE BACKGROUND — 100% no mesmo referencial do scan.py ---
+    # Os pontos XYZ são calculados com a MESMA função get_3d_points e os MESMOS
+    # parâmetros, logo estão no mesmo referencial. A comparação por voxel é direta.
     if pts.size > 0:
-        # Converter novos pontos para índices de voxel
-        v_coords = np.floor(pts / RAIO_MIN).astype(int)
-        
-        for i in range(len(v_coords)):
-            v_tup = (v_coords[i,0], v_coords[i,1], v_coords[i,2])
-            
-            # FILTRAGEM: Só aceita se NÃO estiver no Background (Cenário Original)
-            if v_tup not in voxels_bg:
-                mapa_dinamico[v_tup] = [pts[i], t_atual]
+        v_coords = np.floor(pts / RAIO_MIN).astype(np.int32)
 
-    # ATUALIZAÇÃO DO GRÁFICO (10 Hz para manter Simulação a 1.0x)
-    if t_atual - last_plot_time > 0.1:
-        # Limpeza Temporal (Decaimento)
-        mapa_dinamico = {k: v for k, v in mapa_dinamico.items() if (t_atual - v[1]) <= TEMPO_VIDA}
-        
-        if mapa_dinamico:
-            pts_display = np.array([v[0] for v in mapa_dinamico.values()])
-            # Desenha os novos objetos em VERMELHO
-            scatter.set_data(pts_display, edge_color=None, face_color=(1, 0, 0, 1), size=4)
-        else:
-            scatter.set_data(np.zeros((0, 3)))
-        
-        app.process_events()
+        # Verificar quais voxels NÃO estão no background (são objetos novos)
+        novos_mask = np.array(
+            [tuple(v_coords[i].tolist()) not in voxels_bg
+             for i in range(len(v_coords))],
+            dtype=bool
+        )
+
+        pts_novos   = pts[novos_mask]
+        vkeys_novos = v_coords[novos_mask]
+
+        if len(pts_novos) > 0:
+            _inserir(pts_novos, vkeys_novos, t_atual)
+
+    # --- LIMPEZA CONTÍNUA — corre cada frame para garantir precisão de 1 ciclo ---
+    _limpar(t_atual)
+
+    # --- PROGRESSO NA CONSOLA ---
+    if t_atual - last_report >= REPORT_INTERVAL:
+        confiaveis = int(np.sum(vox_votos[:n_pontos] >= VOTOS_MINIMOS)) if n_pontos > 0 else 0
+        print(f"[SEARCH] t={t_rel:.0f}s | voxels totais={n_pontos} | confirmados={confiaveis}")
+        last_report = t_atual
+
+    # --- ENVIO PARA VISPY ---
+    if t_atual - last_plot_time > PLOT_INTERVAL:
+        snap = _pontos_confiaveis()
+
+        if _data_queue.full():
+            try:    _data_queue.get_nowait()
+            except queue.Empty: pass
+        try:    _data_queue.put_nowait(snap)
+        except queue.Full: pass
+
         last_plot_time = t_atual
 
+# ==============================================================================
 # LIMPEZA FINAL
-canvas.close()
-print(f"Search concluído. Janela fechada.")
+# ==============================================================================
+_stop_event.set()
+_t.join(timeout=2.0)
+print("[SEARCH] Concluído.")

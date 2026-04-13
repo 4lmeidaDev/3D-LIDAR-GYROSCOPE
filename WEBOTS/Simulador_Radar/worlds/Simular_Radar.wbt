@@ -3,14 +3,13 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/boston_dynamics/spot/protos/Spot.proto"
 
 WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.39695127498586485 0.32534083170542927 -0.8582441543711883 1.9684709250584358
-  position 4.641694401115123 13.600898635595692 18.58109779866195
+  orientation 0.1921964958154999 0.1504013302915361 -0.9697628302027146 1.9209678792927234
+  position 1.0241451546219889 2.1686681352332307 1.148068422805231
 }
 TexturedBackground {
 }
@@ -33,7 +32,7 @@ Robot {
       }
       geometry DEF ANEL_EXTERIOR Mesh {
         url [
-          "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/ANEL_EXTERIOR.STL"
+          "../../ROBOT_LIDAR_STL/meshes/ANEL_EXTERIOR.STL"
         ]
       }
     }
@@ -63,7 +62,7 @@ Robot {
             }
             geometry DEF ANEL_INTERIOR Mesh {
               url [
-                "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/ANEL_INTERIOR.STL"
+                "../../ROBOT_LIDAR_STL/meshes/ANEL_INTERIOR.STL"
               ]
             }
           }
@@ -101,7 +100,7 @@ Robot {
                   }
                   geometry DEF PLATAFORMA Mesh {
                     url [
-                      "C:/Users/franc/Desktop/PROJETO LIDAR/SOLIDWORKS TERMINDADO/ROBOTLIDARABS/meshes/PLATAFORMA.STL"
+                      "../../ROBOT_LIDAR_STL/meshes/PLATAFORMA.STL"
                     ]
                   }
                 }
@@ -155,7 +154,4 @@ Robot {
     ]
   }
   controller "my_controller"
-}
-Spot {
-  translation -1.66 -2.81 0.624
 }
