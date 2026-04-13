@@ -5,27 +5,37 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/boston_dynamics/spot/protos/Spot.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/humans/pedestrian/protos/Pedestrian.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/apartment_structure/protos/Wall.proto"
 
 WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.3712058152272304 0.35904256659236444 -0.8563262684959835 1.7988072702402587
-  position 0.9561954019600243 6.381637876990134 7.417929818681609
+  orientation 0.34468595237638794 -0.5296830670555626 -0.7750015759396847 4.932081249713162
+  position -3.820523662861146 -14.104613900123981 16.735571238344427
 }
 TexturedBackground {
 }
 RectangleArena {
   translation 0.220066 0.0557508 4.44089e-16
-  floorSize 9 12
+  floorSize 9 24
   floorTileSize 1 1
   wallHeight 5
+}
+Wall {
+  translation 1.32 10.04 0
+  rotation 0 0 1 3.14159
+  name "wall(2)"
+  size 0.2 4 2.4
 }
 TexturedBackgroundLight {
 }
 Robot {
   translation 0.23 0 0
   children [
+    InertialUnit {
+      name "imu"
+    }
     Shape {
       appearance DEF ANEL_EXTERIOR_material PBRAppearance {
         baseColor 0.79216 0.81961 0.93333
@@ -54,7 +64,7 @@ Robot {
       ]
       endPoint Solid {
         translation 0 0 0.13
-        rotation 1 0 0 1.5708
+        rotation 1 -3.5171572114704255e-15 -1.2168194206684208e-15 1.570799999999842
         children [
           Shape {
             appearance DEF ANEL_INTERIOR_material PBRAppearance {
@@ -82,7 +92,7 @@ Robot {
               }
             ]
             endPoint Solid {
-              rotation 0 0 1 0.05079699999999988
+              rotation -1.8540704308625104e-14 -1.87845837050227e-15 1 0.05079699999441287
               children [
                 Lidar {
                   translation 0 0.032 0
@@ -163,4 +173,15 @@ Spot {
 Pedestrian {
   translation 2.41115 -2.41116 1.27
   rotation 0 0 1 2.35619
+}
+Wall {
+  translation 1.32 2.04 0
+  rotation 0 0 1 -1.5707953071795862
+  size 0.2 7 2.4
+}
+Wall {
+  translation -0.84 5.33 0
+  rotation 0 0 1 -1.5707953071795862
+  name "wall(1)"
+  size 0.2 7 2.4
 }

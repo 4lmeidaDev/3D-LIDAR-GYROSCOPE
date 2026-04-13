@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import ttk
 import os
 import math
-import types
 from controller import Robot
 
 # ==============================================================================
@@ -13,14 +12,8 @@ timestep = int(robot.getBasicTimeStep())
 
 # ==============================================================================
 # PRÉ-COMPILAÇÃO DOS SCRIPTS
-#
-# Problema original: exec() lia e compilava o ficheiro do disco cada vez que
-# carregavas no botão. Em Python, compilar código é caro.
-#
-# Solução: compilar uma vez no arranque, reutilizar o bytecode em cada execução.
-# Se o ficheiro não existir ainda (primeira vez), compila quando for necessário.
 # ==============================================================================
-_bytecode_cache = {}   # { "scan.py": <code object>, "search.py": <code object> }
+_bytecode_cache = {}
 
 def _compilar(nome_ficheiro):
     """Lê e compila o ficheiro para bytecode. Guarda em cache."""
@@ -39,18 +32,16 @@ def _compilar(nome_ficheiro):
     return _bytecode_cache[nome_ficheiro]
 
 def _invalidar_cache(nome_ficheiro):
-    """Remove o ficheiro da cache para forçar recompilação (útil após editar)."""
     _bytecode_cache.pop(nome_ficheiro, None)
 
-# Pré-compilar ambos os scripts no arranque do Webots
-for _f in ("scan.py", "search.py", "searchDBSCAN.py"):
+for _f in ("scan.py", "search.py", "searchDBSCAN.py", "slam.py"):
     _compilar(_f)
 
 # ==============================================================================
 # ESTADO DE EXECUÇÃO
-# Impede que dois scripts corram ao mesmo tempo (duplo clique acidental)
 # ==============================================================================
-_a_executar = False
+_a_executar  = False
+_action_btns = []   # preenchido depois da GUI — evita repetir config() por botão
 
 def executar_script(nome_ficheiro):
     global _a_executar
@@ -59,7 +50,6 @@ def executar_script(nome_ficheiro):
         print(f"[CTRL] Já existe um script em execução. Aguarda que termine.")
         return
 
-    # Atualizar variáveis de ambiente com os valores da GUI
     os.environ["MODO_SCAN"]   = combo_modo.get()
     os.environ["PARAM_TEMPO"] = entry_tempo.get()
     os.environ["PARAM_FREQ"]  = entry_freq.get()
@@ -69,30 +59,27 @@ def executar_script(nome_ficheiro):
     except ValueError:
         os.environ["PARAM_FOV"] = "1.047"
 
-    # Obter bytecode (da cache ou compilar agora)
     codigo = _compilar(nome_ficheiro)
     if codigo is None:
         return
 
     print(f"\n[CTRL] A executar: {nome_ficheiro}...")
     _a_executar = True
-    btn_scan.config(state="disabled")
-    btn_search.config(state="disabled")
-    btn_search_dbscan.config(state="disabled")
+    for b in _action_btns:
+        b.config(state="disabled")
 
     try:
         exec(codigo, globals())
     except SystemExit:
-        pass   # scripts usam raise SystemExit para sair limpo
-    except Exception as e:
+        pass
+    except Exception:
         import traceback
         print(f"[CTRL] ERRO em '{nome_ficheiro}':")
         traceback.print_exc()
     finally:
         _a_executar = False
-        btn_scan.config(state="normal")
-        btn_search.config(state="normal")
-        btn_search_dbscan.config(state="normal")
+        for b in _action_btns:
+            b.config(state="normal")
         print(f"[CTRL] '{nome_ficheiro}' terminou.\n")
 
 # ==============================================================================
@@ -100,16 +87,19 @@ def executar_script(nome_ficheiro):
 # ==============================================================================
 root = tk.Tk()
 root.title("MASTER CONTROL")
-root.geometry("320x480")
+root.geometry("320x600")
 root.attributes('-topmost', True)
 root.resizable(False, False)
 
-# --- Cabeçalho ---
-ttk.Label(root, text="CONFIGURAÇÕES", font=('Arial', 10, 'bold')).pack(pady=10)
+style = ttk.Style()
+style.configure("Static.TLabelframe.Label", foreground="#2980b9", font=('Arial', 9, 'bold'))
+style.configure("Mobil.TLabelframe.Label",  foreground="#27ae60", font=('Arial', 9, 'bold'))
 
-# --- Campos de parâmetros ---
+# --- Parâmetros globais ---
+ttk.Label(root, text="CONFIGURAÇÕES", font=('Arial', 10, 'bold')).pack(pady=(10, 4))
+
 frame_params = ttk.Frame(root)
-frame_params.pack(padx=20, fill='x')
+frame_params.pack(padx=14, fill='x')
 
 def _campo(parent, label, default):
     ttk.Label(parent, text=label).pack(anchor='w')
@@ -118,64 +108,72 @@ def _campo(parent, label, default):
     e.pack(fill='x', pady=2)
     return e
 
-entry_tempo = _campo(frame_params, "Tempo (s):",         "60")
-entry_freq  = _campo(frame_params, "Frequência (Hz):",   "0.3")
-entry_fov   = _campo(frame_params, "FOV Giro (Graus):",  "60")
+entry_tempo = _campo(frame_params, "Tempo (s):",        "60")
+entry_freq  = _campo(frame_params, "Frequência (Hz):",  "0.3")
+entry_fov   = _campo(frame_params, "FOV Giro (Graus):", "60")
 
-# --- Secção SCAN ---
-ttk.Separator(root, orient='horizontal').pack(fill='x', pady=10, padx=10)
+# ==============================================================================
+# SECÇÃO STATIC
+# ==============================================================================
+frame_static = ttk.LabelFrame(root, text=" STATIC ", style="Static.TLabelframe", padding=8)
+frame_static.pack(padx=14, pady=(10, 4), fill='x')
 
-frame_scan = ttk.Frame(root)
-frame_scan.pack(padx=20, fill='x')
-
-combo_modo = ttk.Combobox(frame_scan, values=["SINOSOIDAL", "ORIGINAL"], state="readonly")
+combo_modo = ttk.Combobox(frame_static, values=["SINOSOIDAL", "ORIGINAL"], state="readonly")
 combo_modo.set("SINOSOIDAL")
-combo_modo.pack(fill='x', pady=2)
+combo_modo.pack(fill='x', pady=(0, 4))
 
 btn_scan = ttk.Button(
-    frame_scan, text="▶  INICIAR SCAN",
+    frame_static, text="▶  SCAN",
     command=lambda: executar_script("scan.py")
 )
-btn_scan.pack(fill='x', pady=4)
-
-# Botão para invalidar cache (útil se editares scan.py ou search.py em runtime)
-ttk.Button(
-    frame_scan, text="↺  Recarregar Scripts",
-    command=lambda: [_invalidar_cache("scan.py"), _invalidar_cache("search.py"),
-                     [_compilar(f) for f in ("scan.py", "search.py")],
-                     print("[CTRL] Scripts recarregados.")]
-).pack(fill='x')
-
-# --- Secção SEARCH ---
-ttk.Separator(root, orient='horizontal').pack(fill='x', pady=10, padx=10)
-
-frame_search = ttk.Frame(root)
-frame_search.pack(padx=20, fill='x')
+btn_scan.pack(fill='x', pady=2)
 
 btn_search = ttk.Button(
-    frame_search, text="▶  INICIAR SEARCH",
+    frame_static, text="▶  SEARCH",
     command=lambda: executar_script("search.py")
 )
-btn_search.pack(fill='x', pady=4)
+btn_search.pack(fill='x', pady=2)
 
 btn_search_dbscan = ttk.Button(
-    frame_search, text="▶  SEARCH DBSCAN",
+    frame_static, text="▶  SEARCH DBSCAN",
     command=lambda: executar_script("searchDBSCAN.py")
 )
-btn_search_dbscan.pack(fill='x', pady=4)
+btn_search_dbscan.pack(fill='x', pady=2)
+
+ttk.Button(
+    frame_static, text="↺  Recarregar Scripts",
+    command=lambda: [
+        [_invalidar_cache(f) for f in ("scan.py", "search.py", "searchDBSCAN.py", "slam.py")],
+        [_compilar(f)        for f in ("scan.py", "search.py", "searchDBSCAN.py", "slam.py")],
+        print("[CTRL] Scripts recarregados.")
+    ]
+).pack(fill='x', pady=(6, 0))
+
+# ==============================================================================
+# SECÇÃO MOBIL
+# ==============================================================================
+frame_mobil = ttk.LabelFrame(root, text=" MOBIL ", style="Mobil.TLabelframe", padding=8)
+frame_mobil.pack(padx=14, pady=(6, 4), fill='x')
+
+btn_slam = ttk.Button(
+    frame_mobil, text="▶  SLAM",
+    command=lambda: executar_script("slam.py")
+)
+btn_slam.pack(fill='x', pady=2)
+
+# --- Registar todos os botões de ação (desativados durante execução) ---
+_action_btns.extend([btn_scan, btn_search, btn_search_dbscan, btn_slam])
 
 # --- Status bar ---
-ttk.Separator(root, orient='horizontal').pack(fill='x', pady=10, padx=10)
+ttk.Separator(root, orient='horizontal').pack(fill='x', pady=8, padx=10)
 lbl_status = ttk.Label(root, text="Pronto.", foreground="gray")
 lbl_status.pack()
 
 # ==============================================================================
 # LOOP PRINCIPAL DO WEBOTS
-# Tkinter.update() só é chamado a cada 4 timesteps para não desperdiçar CPU
-# quando a simulação está a correr pesado (scan/search ativos).
 # ==============================================================================
-_tk_counter = 0
-_TK_INTERVAL = 4   # chamar root.update() 1 em cada 4 steps
+_tk_counter  = 0
+_TK_INTERVAL = 4
 
 while robot.step(timestep) != -1:
     _tk_counter += 1
