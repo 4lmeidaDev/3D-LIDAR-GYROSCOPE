@@ -210,15 +210,31 @@ while robot.step(timestep) != -1:
         last_plot_time = t
 
 # ==============================================================================
-# GUARDAR FICHEIRO DE BACKGROUND
+# GUARDAR FICHEIRO DE BACKGROUND + PARÂMETROS DE CINEMÁTICA
 # ==============================================================================
 print("-" * 52)
 if n_voxels > 0:
     final = vox_pts[:n_voxels].copy()
     np.save("scan_otimizado.npy", final)
-    print(f"[SCAN] ✓ Guardado:  scan_otimizado.npy")
+
+    # Guardar parâmetros críticos para que o search.py use SEMPRE os mesmos valores
+    # independentemente do que estiver na GUI quando for lançado
+    import json
+    params = {
+        "FOV_G":     FOV_G,
+        "RAIO_MIN":  RAIO_MIN,
+        "Z_TORRE":   Z_TORRE,
+        "L_BRACO":   L_BRACO,
+        "SUBSAMPLE": SUBSAMPLE,
+    }
+    with open("scan_params.json", "w") as f:
+        json.dump(params, f, indent=2)
+
+    print(f"[SCAN] ✓ Guardado:       scan_otimizado.npy")
+    print(f"[SCAN] ✓ Parâmetros:     scan_params.json")
     print(f"[SCAN] ✓ Voxels únicos:  {n_voxels:,}")
     print(f"[SCAN] ✓ Resolução:      {RAIO_MIN*100:.0f} cm por célula")
+    print(f"[SCAN] ✓ FOV gravado:    {math.degrees(FOV_G):.1f}°")
     print(f"[SCAN] ✓ Tamanho:        {final.nbytes / 1024:.1f} KB")
     print(f"[SCAN] ✓ Pronto para o search.py")
 else:

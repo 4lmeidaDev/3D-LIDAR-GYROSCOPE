@@ -8,27 +8,44 @@ from vispy import app, scene
 from kinematics import get_3d_points
 
 # ==============================================================================
-# CONFIGURAÇÕES — DEVEM SER BYTE-A-BYTE IGUAIS AO scan.py
-# Se mudares qualquer valor aqui, muda também no scan.py e volta a fazer scan!
+# CONFIGURAÇÕES — os parâmetros de MOVIMENTO podem ser diferentes do scan
+# mas os parâmetros de CINEMÁTICA têm de ser IGUAIS ao scan.
+# São carregados automaticamente do scan_params.json gerado pelo scan.py.
 # ==============================================================================
 Z_TORRE, L_BRACO = 0.130, 0.032
-RAIO_MIN         = 0.05   # Resolução de 5cm — IGUAL ao scan.py
+RAIO_MIN         = 0.05
+SUBSAMPLE        = 3
 
 FREQ        = float(os.getenv("PARAM_FREQ",  0.5))
 FOV_G       = float(os.getenv("PARAM_FOV",   1.047))
 TEMPO_TOTAL = float(os.getenv("PARAM_TEMPO", 40.0))
 
-SUBSAMPLE     = 3          # IGUAL ao scan.py — mesma amostragem de feixes
-PLOT_INTERVAL = 1.0 / 20  # Atualizar gráfico a 20 Hz
+PLOT_INTERVAL = 1.0 / 20
 
-# Decaimento: um ponto morre exatamente após 1 ciclo completo do gimbal.
-# Quando o lidar volta a passar pelo mesmo ponto em t2 = t1 + T_ciclo,
-# o ponto inserido em t1 já foi apagado — a janela é limpa a cada varredura.
-T_CICLO    = 1.0 / FREQ          # duração de 1 ciclo sinusoidal completo
-TEMPO_VIDA = T_CICLO             # ponto vive exatamente 1 ciclo
+# Carregar parâmetros críticos de cinemática do scan — sobrepõem a GUI
+import json
+path_params = "scan_params.json"
+if os.path.exists(path_params):
+    with open(path_params) as f:
+        p = json.load(f)
+    FOV_G_scan = p["FOV_G"]
+    RAIO_MIN   = p["RAIO_MIN"]
+    Z_TORRE    = p["Z_TORRE"]
+    L_BRACO    = p["L_BRACO"]
+    SUBSAMPLE  = p["SUBSAMPLE"]
 
-# Sistema de votos: um voxel só é mostrado depois de ser visto N vezes
-# Aumenta para reduzir falsos positivos, diminui para ser mais sensível
+    if abs(FOV_G - FOV_G_scan) > 0.01:
+        print(f"[SEARCH] AVISO: FOV da GUI ({math.degrees(FOV_G):.1f}°) é diferente do scan ({math.degrees(FOV_G_scan):.1f}°).")
+        print(f"[SEARCH]        A usar FOV do scan para garantir cobertura correta.")
+    FOV_G = FOV_G_scan
+    print(f"[SEARCH] Parâmetros do scan carregados: FOV={math.degrees(FOV_G):.1f}° | RAIO={RAIO_MIN*100:.0f}cm | SUBSAMPLE=1/{int(SUBSAMPLE)}")
+else:
+    print(f"[SEARCH] AVISO: scan_params.json não encontrado — a usar valores padrão.")
+    print(f"[SEARCH]        Garante que scan.py foi corrido nesta sessão.")
+
+T_CICLO    = 1.0 / FREQ
+TEMPO_VIDA = T_CICLO
+
 VOTOS_MINIMOS = 2
 
 # ==============================================================================
