@@ -3,16 +3,14 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/boston_dynamics/spot/protos/Spot.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/humans/pedestrian/protos/Pedestrian.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/apartment_structure/protos/Wall.proto"
 
 WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.34468595237638794 -0.5296830670555626 -0.7750015759396847 4.932081249713162
-  position -3.820523662861146 -14.104613900123981 16.735571238344427
+  orientation 0.27622137366829247 -0.2188880120796967 -0.9358364124656617 4.474613168249415
+  position 2.087629287147016 -12.399214356895568 8.300123151920285
 }
 TexturedBackground {
 }
@@ -33,6 +31,11 @@ TexturedBackgroundLight {
 Robot {
   translation 0.23 0 0
   children [
+    Gyro {
+    }
+    Accelerometer {
+      name "accel"
+    }
     InertialUnit {
       name "imu"
     }
@@ -64,7 +67,7 @@ Robot {
       ]
       endPoint Solid {
         translation 0 0 0.13
-        rotation 1 -3.5171572114704255e-15 -1.2168194206684208e-15 1.570799999999842
+        rotation 1 -5.85091115430036e-16 -2.7476567563481502e-15 1.570799999999768
         children [
           Shape {
             appearance DEF ANEL_INTERIOR_material PBRAppearance {
@@ -92,7 +95,7 @@ Robot {
               }
             ]
             endPoint Solid {
-              rotation -1.8540704308625104e-14 -1.87845837050227e-15 1 0.05079699999441287
+              rotation 3.0574926788655493e-13 -8.595014351479887e-15 1 0.05079699999122154
               children [
                 Lidar {
                   translation 0 0.032 0
@@ -166,13 +169,6 @@ Robot {
     ]
   }
   controller "my_controller"
-}
-Spot {
-  translation -1.18 -1.39 0.624
-}
-Pedestrian {
-  translation 2.41115 -2.41116 1.27
-  rotation 0 0 1 2.35619
 }
 Wall {
   translation 1.32 2.04 0
