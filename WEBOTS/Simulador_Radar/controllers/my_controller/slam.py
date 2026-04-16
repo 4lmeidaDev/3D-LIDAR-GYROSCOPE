@@ -9,6 +9,7 @@ import os, math, threading, queue
 import vispy
 from vispy import app, scene
 from kinematics import get_3d_points
+from sklearn.cluster import DBSCAN
 
 try:
     from scipy.spatial import cKDTree as _KDTree
@@ -39,7 +40,12 @@ T_ICP        = max(1.0 / FREQ, 2.0) # Tempo entre ciclos de ICP (em segundos)
 VOXEL_ICP    = 0.08                 # Simplificação da nuvem para o ICP ser rápido
 MAX_ICP_ITER = 30
 ICP_MAX_DIST = 0.4                  # Distância mais curta para evitar colar paredes erradas
-TOLERANCIA_MAPA = 0.10              # 5 cm: Raio para considerar que um ponto já existe
+TOLERANCIA_MAPA = 0.075              # 5 cm: Raio para considerar que um ponto já existe
+
+# Variáveis globais para não correr o DBSCAN sempre que a câmara mexe
+_cache_mapa_len = 0
+_cache_cores = None
+
 
 IMU_DEVICE   = "imu"
 GYRO_DEVICE  = "gyro"
@@ -48,6 +54,53 @@ ACCEL_DEVICE = "accel"
 # ──────────────────────────────────────────────────────────────
 # MATEMÁTICA, FÍSICA E ICP
 # ──────────────────────────────────────────────────────────────
+
+#DEFINICAO PARA FAZER DBSCAN E IDENTIFICAR ENTIDADES DIFERENTES
+def _cor(pts):
+    global _cache_mapa_len, _cache_cores
+    
+    # Só volta a calcular os clusters se o mapa tiver crescido com pontos novos
+    if len(pts) == _cache_mapa_len and _cache_cores is not None:
+        return _cache_cores
+        
+    cores = np.ones((len(pts), 4), dtype=np.float32) # Base: branco/cinza
+    
+    # 1. IDENTIFICAR O CHÃO (Exemplo: tudo o que estiver abaixo do lidar - 10 cm)
+    # Assumindo que o lidar está a Z_TORRE (0.13m), o chão deve estar perto de Z = -0.13m em relação ao lidar
+    # Mas como estamos no referencial do mundo, vamos assumir que os pontos mais baixos são o chão
+    z_min = np.min(pts[:, 2]) if len(pts) > 0 else 0
+    mask_chao = pts[:, 2] < (z_min + 0.15) # Tudo nos 15 cm mais baixos é chão
+    
+    # Pintar o chão de cinzento escuro
+    cores[mask_chao] = [0.3, 0.3, 0.3, 1.0] 
+    
+    # 2. IDENTIFICAR OBJETOS (DBSCAN apenas no que não é chão)
+    mask_objetos = ~mask_chao
+    pts_objetos = pts[mask_objetos]
+    
+    if len(pts_objetos) > 0:
+        # eps: distância máxima para dois pontos serem do mesmo cluster (30 cm)
+        # min_samples: pontos mínimos para ser considerado um objeto (e não lixo/ruído)
+        clustering = DBSCAN(eps=0.30, min_samples=20, n_jobs=-1).fit(pts_objetos)
+        labels = clustering.labels_
+        
+        # Atribuir cores aleatórias aos diferentes clusters encontrados
+        cores_unicas = {}
+        for i, label in enumerate(labels):
+            if label == -1:
+                # Ruído (pontos soltos) ficam a vermelho
+                cores[mask_objetos][i] = [1.0, 0.0, 0.0, 1.0] 
+            else:
+                if label not in cores_unicas:
+                    # Gera uma cor viva aleatória para cada novo objeto detetado
+                    cores_unicas[label] = np.append(np.random.rand(3) * 0.8 + 0.2, 1.0)
+                cores[np.where(mask_objetos)[0][i]] = cores_unicas[label]
+
+    _cache_mapa_len = len(pts)
+    _cache_cores = cores
+    return cores
+    
+
 def _rpy_to_R(roll, pitch, yaw):
     cr, sr = math.cos(roll),  math.sin(roll)
     cp, sp = math.cos(pitch), math.sin(pitch)

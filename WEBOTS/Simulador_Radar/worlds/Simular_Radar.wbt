@@ -10,21 +10,28 @@ WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.2247325403181457 -0.683660387993905 -0.6943369205293465 5.225465783679726
-  position -7.229898258466156 -3.6447365671976835 7.071161992896022
+  orientation -0.09392428495246126 -0.9930612103204693 0.07076483062237394 5.2151026170198636
+  position -23.86780486020699 1.4969519599449193 29.004034980099156
 }
 TexturedBackground {
 }
 RectangleArena {
-  translation 0.220066 0.0557508 4.44089e-16
+  translation -10.8499 0.0557395 4.44089e-16
+  rotation 0 0 1 -1.5707953071795862
   floorSize 9 24
   floorTileSize 1 1
   wallHeight 2
 }
 Wall {
-  translation 1.32 10.04 -1.28
+  translation -8.22 3.27 -1.28
   rotation 0 0 1 3.14159
   name "wall(2)"
+  size 0.2 4 2.4
+}
+Wall {
+  translation -8.22 -3.02 -1.28
+  rotation 0 0 1 3.14159
+  name "wall(3)"
   size 0.2 4 2.4
 }
 TexturedBackgroundLight {
@@ -68,7 +75,7 @@ Robot {
       ]
       endPoint Solid {
         translation 0 0 0.13
-        rotation 1 -5.85091115430036e-16 -2.7476567563481502e-15 1.570799999999768
+        rotation 1 -3.2393987929086307e-16 -2.8359742949450596e-15 1.5707999999997646
         children [
           Shape {
             appearance DEF ANEL_INTERIOR_material PBRAppearance {
@@ -96,7 +103,7 @@ Robot {
               }
             ]
             endPoint Solid {
-              rotation 3.0574926788655493e-13 -8.595014351479887e-15 1 0.05079699999122154
+              rotation 6.638559934541236e-13 -1.3046747228736703e-14 1 0.05079699999096798
               children [
                 Lidar {
                   translation 0 0.032 0
@@ -172,15 +179,15 @@ Robot {
   controller "my_controller"
 }
 Wall {
-  translation 1.32 2.04 -0.92
-  rotation 0 0 1 -1.5707953071795862
-  size 0.2 7 2.4
+  translation -3.85 2.90602 -0.92
+  rotation 0 0 -1 0.523598
+  size 0.2 4 2.5
 }
 Wall {
-  translation -0.84 5.33 -1.24
-  rotation 0 0 1 -1.5707953071795862
+  translation -4.71 -3.05 -1.24
+  rotation 0 0 1 1.01503e-06
   name "wall(1)"
-  size 0.2 7 2.4
+  size 0.2 4 2.4
 }
 Mir100 {
   translation 0.14 -0.01 0
