@@ -36,10 +36,10 @@ VOXEL_MAP   = 0.05
 
 # Parâmetros ICP e Filtro
 T_ICP        = max(1.0 / FREQ, 2.0) # Tempo entre ciclos de ICP (em segundos)
-VOXEL_ICP    = 0.15                 # Simplificação da nuvem para o ICP ser rápido
+VOXEL_ICP    = 0.08                 # Simplificação da nuvem para o ICP ser rápido
 MAX_ICP_ITER = 30
-ICP_MAX_DIST = 0.8                  # Distância mais curta para evitar colar paredes erradas
-TOLERANCIA_MAPA = 0.05              # 5 cm: Raio para considerar que um ponto já existe
+ICP_MAX_DIST = 0.4                  # Distância mais curta para evitar colar paredes erradas
+TOLERANCIA_MAPA = 0.10              # 5 cm: Raio para considerar que um ponto já existe
 
 IMU_DEVICE   = "imu"
 GYRO_DEVICE  = "gyro"
