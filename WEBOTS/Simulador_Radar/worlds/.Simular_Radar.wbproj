@@ -1,17 +1,20 @@
 Webots Project File version R2023b
-perspectives: 000000ff00000000fd00000002000000010000018000000340fc0200000001fb0000001400540065007800740045006400690074006f0072010000001a000003400000008c00ffffff0000000300000780000000a6fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c0100000000000007800000006900ffffff000005fe0000034000000001000000020000000100000008fc00000000
+perspectives: 000000ff00000000fd00000002000000010000033100000340fc0200000001fb0000001400540065007800740045006400690074006f0072010000001a000003400000008c00ffffff0000000300000780000000a6fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c0100000000000007800000006900ffffff0000044d0000034000000001000000020000000100000008fc00000000
 simulationViewPerspectives: 000000ff000000010000000200000110000004ed0100000002010000000101
 sceneTreePerspectives: 000000ff00000001000000030000002200000302000000fa0100000002010000000201
 maximizedDockId: -1
 centralWidgetVisible: 1
 orthographicViewHeight: 1
-textFiles: 0 "controllers/my_controller/my_controller.py" "controllers/my_controller/scan.py" "controllers/my_controller/search.py" "controllers/my_controller/kinematics.py" "controllers/my_controller/searchDBSCAN.py" "controllers/my_controller/slam.py"
+textFiles: 5 "controllers/my_controller/my_controller.py" "controllers/my_controller/scan.py" "controllers/my_controller/search.py" "controllers/my_controller/kinematics.py" "controllers/my_controller/searchDBSCAN.py" "controllers/my_controller/slam.py"
 globalOptionalRendering: DistanceSensorRays::LidarRaysPaths
 consoles: Console:All:All
 renderingDevicePerspectives: Crazyflie:camera;1;1;0;0
 renderingDevicePerspectives: Mavic 2 PRO:camera;1;1;0;0
+renderingDevicePerspectives: Mir100:depth_camera;1;0.598437;0;0
 renderingDevicePerspectives: Spot:left flank camera;1;0.225;0;0
 renderingDevicePerspectives: Spot:left head camera;1;0.225;0;0
 renderingDevicePerspectives: Spot:rear camera;1;0.225;0;0
 renderingDevicePerspectives: Spot:right flank camera;1;0.225;0;0
 renderingDevicePerspectives: Spot:right head camera;1;0.225;0;0
+renderingDevicePerspectives: Summit-XL Steel:depth_camera;1;1;0;0
+renderingDevicePerspectives: Summit-XL Steel:rgb_camera;1;0.950781;0;0

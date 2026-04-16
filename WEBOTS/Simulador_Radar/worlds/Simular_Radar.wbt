@@ -4,13 +4,14 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/apartment_structure/protos/Wall.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/mir/mir100/protos/Mir100.proto"
 
 WorldInfo {
   basicTimeStep 4
 }
 Viewpoint {
-  orientation 0.27622137366829247 -0.2188880120796967 -0.9358364124656617 4.474613168249415
-  position 2.087629287147016 -12.399214356895568 8.300123151920285
+  orientation 0.2247325403181457 -0.683660387993905 -0.6943369205293465 5.225465783679726
+  position -7.229898258466156 -3.6447365671976835 7.071161992896022
 }
 TexturedBackground {
 }
@@ -18,10 +19,10 @@ RectangleArena {
   translation 0.220066 0.0557508 4.44089e-16
   floorSize 9 24
   floorTileSize 1 1
-  wallHeight 5
+  wallHeight 2
 }
 Wall {
-  translation 1.32 10.04 0
+  translation 1.32 10.04 -1.28
   rotation 0 0 1 3.14159
   name "wall(2)"
   size 0.2 4 2.4
@@ -29,7 +30,7 @@ Wall {
 TexturedBackgroundLight {
 }
 Robot {
-  translation 0.23 0 0
+  translation 0.23 0 0.36
   children [
     Gyro {
     }
@@ -171,13 +172,17 @@ Robot {
   controller "my_controller"
 }
 Wall {
-  translation 1.32 2.04 0
+  translation 1.32 2.04 -0.92
   rotation 0 0 1 -1.5707953071795862
   size 0.2 7 2.4
 }
 Wall {
-  translation -0.84 5.33 0
+  translation -0.84 5.33 -1.24
   rotation 0 0 1 -1.5707953071795862
   name "wall(1)"
   size 0.2 7 2.4
+}
+Mir100 {
+  translation 0.14 -0.01 0
+  rotation 0 0 1 3.14159
 }
