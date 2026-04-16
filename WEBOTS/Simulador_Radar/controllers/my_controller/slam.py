@@ -40,7 +40,15 @@ T_ICP        = max(1.0 / FREQ, 2.0) # Tempo entre ciclos de ICP (em segundos)
 VOXEL_ICP    = 0.08                 # Simplificação da nuvem para o ICP ser rápido
 MAX_ICP_ITER = 30
 ICP_MAX_DIST = 0.4                  # Distância mais curta para evitar colar paredes erradas
-TOLERANCIA_MAPA = 0.075              # 5 cm: Raio para considerar que um ponto já existe
+TOLERANCIA_MAPA = 0.075             # 5 cm: Raio para considerar que um ponto já existe
+
+# ── MODO DE OPERAÇÃO ──────────────────────────────────────────
+# False → Robô terrestre: ICP só corrige X, Y e Yaw.
+#         A altura Z vem exclusivamente dos sensores inerciais.
+# True  → Helicóptero / drone: ICP corrige os 6DoF completos
+#         (X, Y, Z, Roll, Pitch, Yaw).
+ICP_CORRIGE_Z = True
+# ─────────────────────────────────────────────────────────────
 
 # Variáveis globais para não correr o DBSCAN sempre que a câmara mexe
 _cache_mapa_len = 0
@@ -55,7 +63,7 @@ ACCEL_DEVICE = "accel"
 # MATEMÁTICA, FÍSICA E ICP
 # ──────────────────────────────────────────────────────────────
 
-#DEFINICAO PARA FAZER DBSCAN E IDENTIFICAR ENTIDADES DIFERENTES
+# DEFINICAO PARA FAZER DBSCAN E IDENTIFICAR ENTIDADES DIFERENTES
 def _cor(pts):
     global _cache_mapa_len, _cache_cores
     
@@ -65,11 +73,9 @@ def _cor(pts):
         
     cores = np.ones((len(pts), 4), dtype=np.float32) # Base: branco/cinza
     
-    # 1. IDENTIFICAR O CHÃO (Exemplo: tudo o que estiver abaixo do lidar - 10 cm)
-    # Assumindo que o lidar está a Z_TORRE (0.13m), o chão deve estar perto de Z = -0.13m em relação ao lidar
-    # Mas como estamos no referencial do mundo, vamos assumir que os pontos mais baixos são o chão
+    # 1. IDENTIFICAR O CHÃO (tudo o que estiver nos 15 cm mais baixos)
     z_min = np.min(pts[:, 2]) if len(pts) > 0 else 0
-    mask_chao = pts[:, 2] < (z_min + 0.15) # Tudo nos 15 cm mais baixos é chão
+    mask_chao = pts[:, 2] < (z_min + 0.15)
     
     # Pintar o chão de cinzento escuro
     cores[mask_chao] = [0.3, 0.3, 0.3, 1.0] 
@@ -79,20 +85,15 @@ def _cor(pts):
     pts_objetos = pts[mask_objetos]
     
     if len(pts_objetos) > 0:
-        # eps: distância máxima para dois pontos serem do mesmo cluster (30 cm)
-        # min_samples: pontos mínimos para ser considerado um objeto (e não lixo/ruído)
         clustering = DBSCAN(eps=0.30, min_samples=20, n_jobs=-1).fit(pts_objetos)
         labels = clustering.labels_
         
-        # Atribuir cores aleatórias aos diferentes clusters encontrados
         cores_unicas = {}
         for i, label in enumerate(labels):
             if label == -1:
-                # Ruído (pontos soltos) ficam a vermelho
                 cores[mask_objetos][i] = [1.0, 0.0, 0.0, 1.0] 
             else:
                 if label not in cores_unicas:
-                    # Gera uma cor viva aleatória para cada novo objeto detetado
                     cores_unicas[label] = np.append(np.random.rand(3) * 0.8 + 0.2, 1.0)
                 cores[np.where(mask_objetos)[0][i]] = cores_unicas[label]
 
@@ -145,6 +146,8 @@ def _voxel(pts, size):
     return pts[idx]
 
 def _icp_6dof(src, tgt):
+    """ICP completo a 6DoF. A restrição ao plano horizontal (4DoF)
+    é aplicada depois, no loop principal, com base em ICP_CORRIGE_Z."""
     if not _HAS_KDTREE or len(src) < 10 or len(tgt) < 10:
         return np.zeros(3), np.eye(3), False
 
@@ -212,13 +215,28 @@ def _vispy_thread():
     
     _cam_ok = [False]
 
-    def _cor(pts):
-        ranges = pts.max(0) - pts.min(0)
-        ax = int(np.argmax(ranges))
-        z  = pts[:, ax]; zt = (z - z.min()) / (z.max() - z.min() + 1e-9)
-        r = np.clip(2*zt - .5, 0, 1).astype(np.float32)
-        g = (np.clip(2*zt, 0, 1) * np.clip(2 - 2*zt, 0, 1)).astype(np.float32)
-        b = np.clip(1 - 2*zt, 0, 1).astype(np.float32)
+    def _cor_vispy(pts):
+        # Colorir pela altura Z: azul (baixo) → ciano → verde → amarelo → vermelho (alto)
+        z  = pts[:, 2]
+        zt = (z - z.min()) / (z.max() - z.min() + 1e-9)  # normalizar 0..1
+
+        # Gradiente de 5 cores em 4 segmentos:
+        # 0.00-0.25  azul   → ciano   (r=0→0,   g=0→1,   b=1→1)
+        # 0.25-0.50  ciano  → verde   (r=0→0,   g=1→1,   b=1→0)
+        # 0.50-0.75  verde  → amarelo (r=0→1,   g=1→1,   b=0→0)
+        # 0.75-1.00  amarelo→ vermelho(r=1→1,   g=1→0,   b=0→0)
+        t0 = np.clip(zt / 0.25, 0, 1)          # seg 0-1
+        t1 = np.clip((zt - 0.25) / 0.25, 0, 1) # seg 1-2
+        t2 = np.clip((zt - 0.50) / 0.25, 0, 1) # seg 2-3
+        t3 = np.clip((zt - 0.75) / 0.25, 0, 1) # seg 3-4
+
+        r = (t2 + t3 * 0).astype(np.float32)          # sobe no seg 2, fica 1 no seg 3
+        g = (t0 - t3).astype(np.float32)               # sobe no seg 0, desce no seg 3
+        b = (1.0 - t1).astype(np.float32)              # começa 1, desce no seg 1
+
+        r = np.clip(r, 0, 1)
+        g = np.clip(g, 0, 1)
+        b = np.clip(b, 0, 1)
         return np.column_stack([r, g, b, np.ones(len(pts), np.float32)])
 
     def _update(ev):
@@ -230,7 +248,7 @@ def _vispy_thread():
         if len(mapa) > 0:
             step = max(1, len(mapa) // 100_000)
             vis  = mapa[::step]
-            map_vis.set_data(vis, edge_color=None, face_color=_cor(vis), size=2)
+            map_vis.set_data(vis, edge_color=None, face_color=_cor_vispy(vis), size=2)
             
         if len(buffer_pts) > 0:
             sb = max(1, len(buffer_pts) // 10_000)
@@ -246,12 +264,15 @@ def _vispy_thread():
         arrow_vis.set_data(np.array([pos_robot, tip], np.float32))
         arrow_tip.set_data(np.array([tip], np.float32),
                            edge_color=None, face_color=(0., 1., 1., 1.), size=10, symbol='disc')
-                           
-        if not _cam_ok[0] and len(mapa) > 0:
-            view.camera.center = tuple(pos_robot)
-            _cam_ok[0] = True
 
-        canvas.title = (f'SLAM | Mapa={len(mapa):,} pts | Buffer={len(buffer_pts):,} pts | '
+        # Câmara centrada no robô
+        if len(mapa) > 0 or len(buffer_pts) > 0:
+            view.camera.center = tuple(pos_robot)
+            if not _cam_ok[0]:
+                _cam_ok[0] = True
+
+        modo = "6DoF" if ICP_CORRIGE_Z else "4DoF (Z=sensores)"
+        canvas.title = (f'SLAM [{modo}] | Mapa={len(mapa):,} pts | Buffer={len(buffer_pts):,} pts | '
                         f'pos=({pos_robot[0]:.2f},{pos_robot[1]:.2f},{pos_robot[2]:.2f})')
 
     _timer = app.Timer(interval=1 / 20, connect=_update, start=True)
@@ -300,6 +321,8 @@ last_plot_time = t_inicio
 last_icp_time  = t_inicio
 
 print("-" * 50)
+modo_str = "6DoF completo (Helicóptero)" if ICP_CORRIGE_Z else "4DoF — Z exclusivo dos sensores (Robô terrestre)"
+print(f"[SLAM] Modo ICP: {modo_str}")
 print("[SLAM] A iniciar tracking com ICP e Filtro Inteligente. Fecha a janela para terminar.")
 print("-" * 50)
 
@@ -364,6 +387,20 @@ while robot.step(timestep) != -1:
             t_corr, R_corr, success = _icp_6dof(_buf, mapa_local)
             
             if success:
+                # ── APLICAR RESTRIÇÃO DE ACORDO COM O MODO ───────────────
+                if not ICP_CORRIGE_Z:
+                    # Modo robô terrestre: ignorar correção Z do ICP.
+                    # Preservar apenas a rotação em Yaw (ignorar Roll/Pitch do ICP).
+                    t_corr[2] = 0.0
+                    yaw_icp = math.atan2(R_corr[1, 0], R_corr[0, 0])
+                    cy, sy = math.cos(yaw_icp), math.sin(yaw_icp)
+                    R_corr = np.array([
+                        [ cy, -sy, 0.],
+                        [ sy,  cy, 0.],
+                        [ 0.,  0., 1.]
+                    ], dtype=np.float64)
+                # ─────────────────────────────────────────────────────────
+
                 t_imu = t_imu + t_corr
                 if _imu is None: 
                     R_imu = _reortho(R_corr @ R_imu)
