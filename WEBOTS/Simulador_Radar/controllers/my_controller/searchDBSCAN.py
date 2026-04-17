@@ -331,8 +331,19 @@ while robot.step(timestep) != -1:
     if _stop_event.is_set():
         break
 
+    if globals().get('_ctrl_stop') and _ctrl_stop.is_set():
+        print("[SEARCH DBSCAN] Parado pelo controlador.")
+        break
+
     t_atual = robot.getTime()
     t_rel   = t_atual - t_inicio
+
+    # Live settings — atualiza FREQ e TEMPO (FOV mantém-se do scan_params.json)
+    _ls = globals().get('_live_settings')
+    if _ls:
+        FREQ        = _ls.get("FREQ",  FREQ)
+        TEMPO_TOTAL = _ls.get("TEMPO", TEMPO_TOTAL)
+
     if t_rel > TEMPO_TOTAL:
         break
 

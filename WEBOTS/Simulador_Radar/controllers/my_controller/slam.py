@@ -332,8 +332,23 @@ print("-" * 50)
 while robot.step(timestep) != -1:
     if _stop.is_set(): break
 
+    if globals().get('_ctrl_stop') and _ctrl_stop.is_set():
+        print("[SLAM] Parado pelo controlador.")
+        break
+
     t_agora = robot.getTime()
     t_rel   = t_agora - t_inicio
+
+    # Live settings — atualiza parâmetros em runtime
+    _ls = globals().get('_live_settings')
+    if _ls:
+        _new_freq = _ls.get("FREQ", FREQ)
+        if _new_freq != FREQ:
+            FREQ  = _new_freq
+            T_ICP = max(1.0 / FREQ, 2.0)
+        FOV_G       = _ls.get("FOV_G", FOV_G)
+        TEMPO_TOTAL = _ls.get("TEMPO", TEMPO_TOTAL)
+
     if t_rel > TEMPO_TOTAL: break
     dt = timestep / 1000.0   
 
