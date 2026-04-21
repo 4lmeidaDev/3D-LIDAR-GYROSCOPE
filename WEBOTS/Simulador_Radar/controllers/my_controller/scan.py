@@ -159,7 +159,18 @@ while robot.step(timestep) != -1:
         print("[SCAN] Janela fechada — scan interrompido.")
         break
 
+    if globals().get('_ctrl_stop') and _ctrl_stop.is_set():
+        print("[SCAN] Parado pelo controlador.")
+        break
+
     t = robot.getTime() - tempo_ini
+
+    # Live settings — atualiza parâmetros se o controlador os tiver modificado
+    _ls = globals().get('_live_settings')
+    if _ls:
+        FREQ        = _ls.get("FREQ",  FREQ)
+        FOV_G       = _ls.get("FOV_G", FOV_G)
+        TEMPO_TOTAL = _ls.get("TEMPO", TEMPO_TOTAL)
 
     if t > TEMPO_TOTAL:
         break
